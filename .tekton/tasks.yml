@@ -1,22 +1,57 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
+  name: cleanup
+spec:
+  workspaces:
+    - name: source
+  steps:
+    - name: remove
+      image: alpine:3
+      env:
+        - name: WORKSPACE_SOURCE_PATH
+          value: $(workspaces.source.path)
+      workingDir: $(workspaces.source.path)
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+        echo "Removing all files from ${WORKSPACE_SOURCE_PATH} ..."
+        if [ -d "${WORKSPACE_SOURCE_PATH}" ] ; then
+          rm -rf "${WORKSPACE_SOURCE_PATH:?}"/*
+          rm -rf "${WORKSPACE_SOURCE_PATH}"/.[!.]*
+          rm -rf "${WORKSPACE_SOURCE_PATH}"/..?*
+        fi
+
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
   name: nose
 spec:
   workspaces:
-    - name: source  # The workspace this task will work with
+    - name: output  # Changed from 'source' to 'output'
   params:
-    - name: args  # Argument to pass to the nosetests command
+    - name: args
       description: Arguments to pass to nose
       type: string
-      default: "-v"  # Default is verbose mode for nose tests
+      default: "-v"
   steps:
-    - name: nosetests  # Step name to run tests
-      image: python:3.9-slim  # Use the Python 3.9-slim image to run the tests
-      workingDir: $(workspaces.source.path)  # Set the working directory to the source workspace
+    - name: nosetests
+      image: python:3.9
+      workingDir: $(workspaces.output.path)  # Updated to use 'output' workspace
       script: |
         #!/bin/bash
-        set -e  # Exit immediately if a command exits with a non-zero status
-        python -m pip install --upgrade pip wheel  # Upgrade pip and wheel
-        pip install -r requirements.txt  # Install dependencies
-        nosetests $(params.args)  # Run tests, passing any arguments defined in `args`
+        set -e
+        python -m pip install --upgrade pip wheel
+        if [ -f requirements.txt ]; then
+            echo "Installing dependencies from requirements.txt..."
+            pip install -r requirements.txt
+        else
+            echo "requirements.txt not found, skipping dependency installation."
+        fi
+        nosetests $(params.args)
+
