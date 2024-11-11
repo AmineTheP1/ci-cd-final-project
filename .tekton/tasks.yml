@@ -1,0 +1,22 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: nose
+spec:
+  workspaces:
+    - name: source  # The workspace this task will work with
+  params:
+    - name: args  # Argument to pass to the nosetests command
+      description: Arguments to pass to nose
+      type: string
+      default: "-v"  # Default is verbose mode for nose tests
+  steps:
+    - name: nosetests  # Step name to run tests
+      image: python:3.9-slim  # Use the Python 3.9-slim image to run the tests
+      workingDir: $(workspaces.source.path)  # Set the working directory to the source workspace
+      script: |
+        #!/bin/bash
+        set -e  # Exit immediately if a command exits with a non-zero status
+        python -m pip install --upgrade pip wheel  # Upgrade pip and wheel
+        pip install -r requirements.txt  # Install dependencies
+        nosetests $(params.args)  # Run tests, passing any arguments defined in `args`
